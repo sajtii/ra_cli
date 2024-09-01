@@ -21,6 +21,7 @@ You will need to create an app on the Discord Developer Portal (https://discord.
 
 ## Usage
 After installing the requirements and ensuring you have all the necessary data, start by launching the setup script with `racli.py -s`. Provide the requested details, and you're good to go. Or, if you prefer you can manually modify config.ini, but be careful, as incorrect changes could break the code. Also, never ever modify `data.ini`.
+
 When you have provided all your details, you can launch the script without flags by running `racli.py`.
 
 
