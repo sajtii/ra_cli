@@ -1,0 +1,4 @@
+blessed
+pillow
+requests
+pypresence
