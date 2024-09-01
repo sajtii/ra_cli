@@ -1,4 +1,4 @@
-# Sajti's CLI for RetroAchievements Rich Presence
+# Sajti's CLI for RetroAchievements Discord Rich Presence
 Another implementation of my previous project ([Sajti's RA Presence](https://github.com/sajtii/SRAP)), fully integrated into a CLI. In my opinion, this one is much better, and I think I have improved a lot while making it.
 
 ## Requirements
@@ -15,14 +15,14 @@ You will need to create an app on the Discord Developer Portal (https://discord.
 
 ## Features
 - Detailed Rich Presence on your Discord profile (name of the game, details about what you're currently doing in the game, icons, etc.)
-- Two clickable buttons (only others can see them): One leads to the RA page of the game you're currently playing; the other leads to your RA profile. You can enable or disable them using `racli.py -b`.
+- Two clickable buttons (only others can see them): One leads to the RA page of the game you're currently playing; the other leads to your RA profile. You can enable or disable them using `python racli.py -b`.
 - A CLI that provides some information, fetches the icon of your current game and attempts to recreate it in the terminal or command line you're using. 
 - Character presets for recreating the game icon, or you can create your own by editing `charset.txt`.
 
 ## Usage
-After installing the requirements and ensuring you have all the necessary data, start by launching the setup script with `racli.py -s`. Provide the requested details, and you're good to go. Or, if you prefer you can manually modify config.ini, but be careful, as incorrect changes could break the code. Also, never ever modify `data.ini`.
+After installing the requirements and ensuring you have all the necessary data, start by launching the setup script with `python racli.py -s` from terminal. Provide the requested details, and you're good to go. Or, if you prefer you can manually modify config.ini, but be careful, as incorrect changes could break the code. Also, never ever modify `data.ini`.
 
-When you have provided all your details, you can launch the script without flags by running `racli.py`.
+When you have provided all your details, you can launch the script without flags by running `pyhon racli.py`.
 
 
 Flag descriptions:
