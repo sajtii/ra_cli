@@ -1,5 +1,6 @@
 # Sajti's CLI for RetroAchievements Discord Rich Presence
 A little software which lets you share your RetroAchievements activity with your friends on Discord.
+
 Another implementation of my previous project ([Sajti's RA Presence](https://github.com/sajtii/SRAP)), fully integrated into a CLI. In my opinion, this one is much better, and I think I have improved a lot while making it.
 
 ## Requirements
