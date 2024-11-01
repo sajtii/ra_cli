@@ -61,7 +61,7 @@ def splitter(text, tx, ty, chsize):
     finaltext=''
     
     #trying to measure the real lenght of the printable text by removing ansi escape and replacing emojis with ee
-    #I use 2 characters for spacers cause sometimes it seems emojis take up 2 character slots
+    #I use 2 characters for spacers because it seems emojis take up 2 character slots
     junk = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\(B)')
     emoji = re.compile("[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U000024C2-\U0001F251]+", flags=re.UNICODE)
     evaulated = junk.sub('', text)
@@ -230,6 +230,22 @@ def set_interval():
         config.write(configfile)
     print(f'\u001b[33mUpdate interval succesfully set to \u001b[35m{interval} \033[0;33mseconds.\033[0m')
     
+def set_timeout():
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    print('\u001b[33mAfter the given amount of cycles, the script stops pushing rich presence.')
+    print('\u001b[33mFor example, if the interval is set to 30 seconds and the timeout to 6, this means after 6 cycles of 30 seconds each (3 minutes), if the status message remains the same, the script will stop updating the presence.')
+    print('\u001b[33mEnter 0 to disable this feature.')
+    timeout = input('\u001b[33mSet the timeout value \u001b[31m(0 to disable)\u001b[33m: \u001b[35m')
+    try:
+        timeout = int(timeout)
+    except ValueError:
+        timeout = 0
+    config['MISC']['timeout'] = str(timeout)
+    with open('config.ini', 'w') as configfile:
+        config.write(configfile)
+    print(f"\u001b[33mTimeout value successfully set to \u001b[35m{timeout}\u001b[33m.\u001b[0m")
+    
 def set_charset():
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -279,6 +295,10 @@ def main():
     appid = config.get('DC', 'appid')
     interval = int(config.get('MISC', 'interval'))
     charset_x = config.get('MISC', 'charset')
+    timeout = int(config.get('MISC', 'timeout'))
+    timeout_count = 0
+    
+    #loading other values
     global charset
     if charset_x == '1':
         charset = '█'
@@ -297,7 +317,7 @@ def main():
             charset = '█'
     else:
         charset = '█'
-        
+   
     try:
         interval = int(config.get('MISC', 'interval'))
         if interval < 20:
@@ -310,94 +330,130 @@ def main():
         config['MISC']['interval'] = '20'
         with open('config.ini', 'w') as configfile:
             config.write(configfile)
-
+            
        
     start_time = int(time.time())
     current_game = None
+    RPM_stored = None
+    skip = False
+    ra_userdata = None
     
     RPC = Presence(appid)
     RPC.connect()
     with term.hidden_cursor(), term.cbreak(), term.location(), term.fullscreen():
         termsize = [term.width, term.height]
         while True:
-
-            ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserProfile.php?u={username}&y={apikey}&z={username}")
-            if ra_userdata == None:
-                break
-            ra_game_data = ra_data(f"https://retroachievements.org/API/API_GetGame.php?z={username}&y={apikey}&i={ra_userdata['LastGameID']}")
-            if ra_game_data == None:
-                break
-            ra_game_prog = ra_data(f"https://retroachievements.org/API/API_GetUserProgress.php?y={apikey}&u={username}&i={ra_userdata['LastGameID']}")
-            if ra_game_prog == None:
-                break
-            ra_game_prog = ra_game_prog.get(f'{ra_userdata['LastGameID']}', {})
-            
-            
-            if current_game != ra_userdata['LastGameID']:
-                if config.get('BT', 'gamepage') == '1':
-                    button1 = {"label": "View on RetroAchievements", "url": f"https://retroachievements.org/game/{ra_userdata['LastGameID']}"}
+            while True:
+                if timeout != 0 and timeout  <= timeout_count and ra_userdata["RichPresenceMsg"] == RPM_stored:
+                    RPC.close()
+                    break
+                if not skip:
+                    ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserProfile.php?u={username}&y={apikey}&z={username}")
+                    if ra_userdata == None:
+                        break
+                    else:
+                        RPM_stored = ra_userdata["RichPresenceMsg"]
                 else:
-                    button1 = None
-                if config.get('BT', 'profile') == '1':    
-                    button2 = {"label": f"{username}'s RA Page", "url": f"https://retroachievements.org/user/{username}"}  
-                else:
-                    button2 = None
-                buttons = [button1, button2]
-                if button1 == None and button2 == None:
-                    buttons_filtered = None
-                else:
-                    buttons_filtered = [d for d in buttons if d is not None]
-                print(f"{term.clear()}")
-                current_game = ra_userdata['LastGameID']
-                image = Image.open(io.BytesIO(requests.get(f"https://media.retroachievements.org{ra_game_data['ImageIcon']}").content))
-                pixels = resizer(image)
-                drawer(pixels, term.height)
-                start_time = int(time.time())
-                
+                    skip = False
+                ra_game_data = ra_data(f"https://retroachievements.org/API/API_GetGame.php?z={username}&y={apikey}&i={ra_userdata['LastGameID']}")
+                if ra_game_data == None:
+                    break
+                ra_game_prog = ra_data(f"https://retroachievements.org/API/API_GetUserProgress.php?y={apikey}&u={username}&i={ra_userdata['LastGameID']}")
+                if ra_game_prog == None:
+                    break
+                ra_game_prog = ra_game_prog.get(f'{ra_userdata['LastGameID']}', {})
+                if timeout != 0:
+                    timeout_count +=1
             
-            if ra_game_prog['NumAchieved'] == 0:
-                achi_earned = 0
-                achi_text = f"{term.white}None"
-                rpc_achi = f"\uD83C\uDFC6 0/{ra_game_prog['NumPossibleAchievements']} (None)"
-            elif ra_game_prog['NumAchievedHardcore'] < ra_game_prog['NumAchieved']:
-                achi_earned = ra_game_prog['NumAchieved']
-                achi_text = f"{term.hotpink}Softcore"
-                rpc_achi = f"\uD83C\uDFC6 {ra_game_prog['NumAchieved']}/{ra_game_prog['NumPossibleAchievements']} (Softcore)"
-            else:
-                achi_earned = ra_game_prog['NumAchievedHardcore']
-                achi_text = f"{term.red}Hardcore"
-                rpc_achi = f"\uD83C\uDFC6 {ra_game_prog['NumAchievedHardcore']}/{ra_game_prog['NumPossibleAchievements']} (Hardcore)"
-            cleartext(term.width,term.height)
-            buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'], achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
             
-            RPC.update(
-                state=ra_userdata["RichPresenceMsg"],
-                details=ra_game_data['GameTitle'],
-                start=start_time,
-                large_image=f"https://media.retroachievements.org{ra_game_data['ImageIcon']}",
-                large_text=rpc_achi,
-                small_image=data.get('CI', str(ra_game_data['ConsoleID'])),
-                small_text=ra_game_data['ConsoleName'],
-                buttons=buttons_filtered
-
-            )
-            
-            for i in range(interval):
-                if termsize != [term.width, term.height]:
-                    termsize = [term.width, term.height]
+                if current_game != ra_userdata['LastGameID']:
+                    if config.get('BT', 'gamepage') == '1':
+                        button1 = {"label": "View on RetroAchievements", "url": f"https://retroachievements.org/game/{ra_userdata['LastGameID']}"}
+                    else:
+                        button1 = None
+                    if config.get('BT', 'profile') == '1':    
+                        button2 = {"label": f"{username}'s RA Page", "url": f"https://retroachievements.org/user/{username}"}  
+                    else:
+                        button2 = None
+                    buttons = [button1, button2]
+                    if button1 == None and button2 == None:
+                        buttons_filtered = None
+                    else:
+                        buttons_filtered = [d for d in buttons if d is not None]
                     print(f"{term.clear()}")
+                    current_game = ra_userdata['LastGameID']
+                    image = Image.open(io.BytesIO(requests.get(f"https://media.retroachievements.org{ra_game_data['ImageIcon']}").content))
                     pixels = resizer(image)
                     drawer(pixels, term.height)
-                    buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'], achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
-                time.sleep(1)
-    pass        
-    print("Something went wrong! Run the setup script (racli.py -s) and make sure your details are correct.")        
+                    start_time = int(time.time())
+                
+            
+                if ra_game_prog['NumAchieved'] == 0:
+                    achi_earned = 0
+                    achi_text = f"{term.white}None"
+                    rpc_achi = f"\uD83C\uDFC6 0/{ra_game_prog['NumPossibleAchievements']} (None)"
+                elif ra_game_prog['NumAchievedHardcore'] < ra_game_prog['NumAchieved']:
+                    achi_earned = ra_game_prog['NumAchieved']
+                    achi_text = f"{term.hotpink}Softcore"
+                    rpc_achi = f"\uD83C\uDFC6 {ra_game_prog['NumAchieved']}/{ra_game_prog['NumPossibleAchievements']} (Softcore)"
+                else:
+                    achi_earned = ra_game_prog['NumAchievedHardcore']
+                    achi_text = f"{term.red}Hardcore"
+                    rpc_achi = f"\uD83C\uDFC6 {ra_game_prog['NumAchievedHardcore']}/{ra_game_prog['NumPossibleAchievements']} (Hardcore)"
+                cleartext(term.width,term.height)
+                buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'], achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
+            
+                RPC.update(
+                    state=ra_userdata["RichPresenceMsg"],
+                    details=ra_game_data['GameTitle'],
+                    start=start_time,
+                    large_image=f"https://media.retroachievements.org{ra_game_data['ImageIcon']}",
+                    large_text=rpc_achi,
+                    small_image=data.get('CI', str(ra_game_data['ConsoleID'])),
+                    small_text=ra_game_data['ConsoleName'],
+                    buttons=buttons_filtered
+                )
+                for i in range(interval):
+                    if termsize != [term.width, term.height]:
+                        termsize = [term.width, term.height]
+                        print(f"{term.clear()}")
+                        pixels = resizer(image)
+                        drawer(pixels, term.height)
+                        buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'],     achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
+                    time.sleep(1)
+        
+            
+            if timeout != 0:
+                while True:
+                    for i in range(interval):
+                        if termsize != [term.width, term.height]:
+                            termsize = [term.width, term.height]
+                            print(f"{term.clear()}")
+                            pixels = resizer(image)
+                            drawer(pixels, term.height)
+                            buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'],     achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
+                        time.sleep(1)
+                    ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserProfile.php?u={username}&y={apikey}&z={username}")
+                    if ra_userdata == None:
+                        break
+                    elif ra_userdata["RichPresenceMsg"] != RPM_stored:
+                        RPM_stored == ra_userdata["RichPresenceMsg"]
+                        skip = True
+                        start_time = int(time.time())
+                        timeout_count = 0
+                        RPC.connect()
+                        break
+            else:
+                break
+                       
+    print("Something went wrong! Run the setup script (python racli.py -s) and make sure your details are correct.")
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--setup', action='store_true', help="run setup script")
     parser.add_argument('-c', '--charset', action='store_true', help="select charset presets or set it to custom")
-    parser.add_argument('-i', '--interval', action='store_true', help="set the update interval")
+    parser.add_argument('-i', '--interval', action='store_true', help="set update interval")
+    parser.add_argument('-t', '--timeout', action='store_true', help="set timeout value")
     parser.add_argument('-b', '--buttons', action='store_true', help="enable or disable buttons on your discord profile")
     args = parser.parse_args()
     if args.setup:
@@ -406,6 +462,8 @@ if __name__ == "__main__":
         set_charset()
     elif args.interval:
         set_interval()
+    elif args.timeout:
+        set_timeout()
     elif args.buttons:
         set_buttons()
     else:
