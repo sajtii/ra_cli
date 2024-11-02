@@ -361,7 +361,7 @@ def main():
                 ra_game_prog = ra_data(f"https://retroachievements.org/API/API_GetUserProgress.php?y={apikey}&u={username}&i={ra_userdata['LastGameID']}")
                 if ra_game_prog == None:
                     break
-                ra_game_prog = ra_game_prog.get(f'{ra_userdata['LastGameID']}', {})
+                ra_game_prog = ra_game_prog.get(f"{ra_userdata['LastGameID']}", {})
                 if timeout != 0:
                     timeout_count +=1
             
