@@ -344,17 +344,26 @@ def main():
         termsize = [term.width, term.height]
         while True:
             while True:
-                if timeout != 0 and timeout  <= timeout_count and ra_userdata["RichPresenceMsg"] == RPM_stored:
-                    RPC.close()
-                    break
                 if not skip:
                     ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserProfile.php?u={username}&y={apikey}&z={username}")
                     if ra_userdata == None:
                         break
-                    else:
-                        RPM_stored = ra_userdata["RichPresenceMsg"]
                 else:
                     skip = False
+                    
+                if timeout !=0:
+                    if RPM_stored != ra_userdata["RichPresenceMsg"]:
+                        timeout_count = 0
+                        RPM_stored = ra_userdata["RichPresenceMsg"]
+                    if timeout <= timeout_count:
+                        if ra_userdata["RichPresenceMsg"] == RPM_stored:
+                            RPC.close()
+                            break 
+                        else:
+                            timeout_count = 0
+                    timeout_count +=1
+                
+                    
                 ra_game_data = ra_data(f"https://retroachievements.org/API/API_GetGame.php?z={username}&y={apikey}&i={ra_userdata['LastGameID']}")
                 if ra_game_data == None:
                     break
@@ -362,8 +371,6 @@ def main():
                 if ra_game_prog == None:
                     break
                 ra_game_prog = ra_game_prog.get(f"{ra_userdata['LastGameID']}", {})
-                if timeout != 0:
-                    timeout_count +=1
             
             
                 if current_game != ra_userdata['LastGameID']:
