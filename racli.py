@@ -94,9 +94,20 @@ def splitter(text, tx, ty, chsize):
         nty += 1
         return finaltext, ntx, nty
 
+#trimming the rich presence message for discord in case it is too long. Temporary for now, till I find a better solution.
+def trimmer(text):
+    if len(text.encode("utf_16_le")) <= 256:
+        return text
+    else:
+        final = ""
+        size = 0
+        for i in text:
+            size += len(i.encode("utf_16_le"))
+            if size > 250:
+                return final + "..."
+            final += i
 
 #highlits the rich presence message
-
 def highlighter(text):
     dark_orchid = f'{term.darkorchid1}'
     red = f'{term.red}'
@@ -411,7 +422,7 @@ def main():
                 buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'], achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
             
                 RPC.update(
-                    state=ra_userdata["RichPresenceMsg"],
+                    state=trimmer(ra_userdata["RichPresenceMsg"]),
                     details=ra_game_data['GameTitle'],
                     start=start_time,
                     large_image=f"https://media.retroachievements.org{ra_game_data['ImageIcon']}",
