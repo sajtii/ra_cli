@@ -8,7 +8,10 @@ import re
 import configparser
 import requests
 import io
+from datetime import datetime, timezone
 from pypresence import Presence
+from pypresence.types import ActivityType
+from pypresence.types import StatusDisplayType
 
 term = Terminal()
 
@@ -144,7 +147,7 @@ def highlighter(text):
 
     
 #builds the printable data
-def buildandprint(x, y, username, pointe, pointt, title, con, achi_total, achi_earned, achi_text, rptext, motto):
+def buildandprint(x, y, username, pointe, pointt, title, con, achi_total, achi_earned, achi_text, rptext, motto, rp_date_str):
     tx = 2*y+1
     ty = 0
     chsize = x-2*y
@@ -159,6 +162,7 @@ def buildandprint(x, y, username, pointe, pointt, title, con, achi_total, achi_e
     console = f"{term.yellow2}Console: {term.deepskyblue}{con}{term.normal}"
     achi = f"{term.yellow2}Achievements: {term.green2}{achi_earned}{term.darkorchid1}/{term.green2}{achi_total} {term.darkorchid1}({achi_text}{term.darkorchid1}){term.normal}"
     status = f"{term.yellow2}Status: {rptext}{term.normal}"
+    rp_date = f"{term.yellow2}Status date: {term.deepskyblue}{rp_date_str if rp_date_str else 'N/A'}{term.normal}"
     
     
     finaltext = ''
@@ -177,6 +181,8 @@ def buildandprint(x, y, username, pointe, pointt, title, con, achi_total, achi_e
     finaltext += asd
     asd, _, ty = splitter(status, tx, ty, chsize)
     finaltext += asd
+    asd, _, ty = splitter(rp_date, tx, ty, chsize)
+    finaltext += asd
     printer(finaltext)
     
     
@@ -187,6 +193,11 @@ def cleartext(x, y):
         
         printer(f"{term.move_xy(tx, a)}{term.clear_eol()}")
         
+
+def get_no_cache_string():
+    """Generate datetime string in format ddMMyyyyHHmmss for cache busting"""
+    now = datetime.now()
+    return now.strftime('%d%m%Y%H%M%S')
 
 def ra_data(url):
     response = requests.get(url)
@@ -244,10 +255,10 @@ def set_interval():
 def set_timeout():
     config = configparser.ConfigParser()
     config.read('config.ini')
-    print('\u001b[33mAfter the given amount of cycles, the script stops pushing rich presence.')
-    print('\u001b[33mFor example, if the interval is set to 30 seconds and the timeout to 6, this means after 6 cycles of 30 seconds each (3 minutes), if the status message remains the same, the script will stop updating the presence.')
+    print('\u001b[33mAfter the Rich Presence message date is older than the specified number of seconds, the script stops updating Discord rich presence.')
+    print('\u001b[33mFor example, if the timeout is set to 300 (5 minutes), the script will stop updating Discord when the Rich Presence message is older than 5 minutes.')
     print('\u001b[33mEnter 0 to disable this feature.')
-    timeout = input('\u001b[33mSet the timeout value \u001b[31m(0 to disable)\u001b[33m: \u001b[35m')
+    timeout = input('\u001b[33mSet the timeout value in seconds \u001b[31m(0 to disable)\u001b[33m: \u001b[35m')
     try:
         timeout = int(timeout)
     except ValueError:
@@ -255,7 +266,7 @@ def set_timeout():
     config['MISC']['timeout'] = str(timeout)
     with open('config.ini', 'w') as configfile:
         config.write(configfile)
-    print(f"\u001b[33mTimeout value successfully set to \u001b[35m{timeout}\u001b[33m.\u001b[0m")
+    print(f"\u001b[33mTimeout value successfully set to \u001b[35m{timeout} \033[0;33mseconds.\033[0m")
     
 def set_charset():
     config = configparser.ConfigParser()
@@ -307,7 +318,6 @@ def main():
     interval = int(config.get('MISC', 'interval'))
     charset_x = config.get('MISC', 'charset')
     timeout = int(config.get('MISC', 'timeout'))
-    timeout_count = 0
     
     #loading other values
     global charset
@@ -345,9 +355,8 @@ def main():
        
     start_time = int(time.time())
     current_game = None
-    RPM_stored = None
-    skip = False
     ra_userdata = None
+    rpc_connected = True
     
     RPC = Presence(appid)
     RPC.connect()
@@ -355,24 +364,26 @@ def main():
         termsize = [term.width, term.height]
         while True:
             while True:
-                if not skip:
-                    ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserProfile.php?u={username}&y={apikey}&z={username}")
-                    if ra_userdata == None:
-                        break
-                else:
-                    skip = False
-                    
-                if timeout !=0:
-                    if RPM_stored != ra_userdata["RichPresenceMsg"]:
-                        timeout_count = 0
-                        RPM_stored = ra_userdata["RichPresenceMsg"]
-                    if timeout <= timeout_count:
-                        if ra_userdata["RichPresenceMsg"] == RPM_stored:
-                            RPC.close()
-                            break 
-                        else:
-                            timeout_count = 0
-                    timeout_count +=1
+                no_cache = get_no_cache_string()
+                ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserSummary.php?u={username}&y={apikey}&g=0&a=0&noCache={no_cache}")
+                if ra_userdata == None:
+                    break
+                
+                # Check timeout based on RichPresenceMsgDate
+                if timeout != 0 and rpc_connected:
+                    try:
+                        rp_date_str = ra_userdata.get("RichPresenceMsgDate")
+                        if rp_date_str:
+                            # Parse API date as UTC (API returns UTC times)
+                            rp_date = datetime.strptime(rp_date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                            current_date = datetime.now(timezone.utc)
+                            time_diff = (current_date - rp_date).total_seconds()
+                            if time_diff > timeout:
+                                RPC.close()
+                                rpc_connected = False
+                    except (ValueError, KeyError, TypeError):
+                        # If parsing fails, continue normally
+                        pass
                 
                     
                 ra_game_data = ra_data(f"https://retroachievements.org/API/API_GetGame.php?z={username}&y={apikey}&i={ra_userdata['LastGameID']}")
@@ -419,29 +430,37 @@ def main():
                     achi_text = f"{term.red}Hardcore"
                     rpc_achi = f"\uD83C\uDFC6 {ra_game_prog['NumAchievedHardcore']}/{ra_game_prog['NumPossibleAchievements']} (Hardcore)"
                 cleartext(term.width,term.height)
-                buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'], achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
+                buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'], achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'], ra_userdata.get('RichPresenceMsgDate', ''))
             
-                RPC.update(
-                    state=trimmer(ra_userdata["RichPresenceMsg"]),
-                    details=ra_game_data['GameTitle'],
-                    start=start_time,
-                    large_image=f"https://media.retroachievements.org{ra_game_data['ImageIcon']}",
-                    large_text=rpc_achi,
-                    small_image=data.get('CI', str(ra_game_data['ConsoleID'])),
-                    small_text=ra_game_data['ConsoleName'],
-                    buttons=buttons_filtered
-                )
+                if rpc_connected:
+                    RPC.update(
+                        activity_type=ActivityType.PLAYING,
+                        status_display_type=StatusDisplayType.NAME,
+                        name= ra_game_data['GameTitle'],
+                        details= trimmer(ra_userdata["RichPresenceMsg"]),
+                        state= rpc_achi,
+                        start=start_time,
+                        large_image=f"https://media.retroachievements.org{ra_game_data['ImageIcon']}",
+                        large_text=rpc_achi,
+                        small_image=data.get('CI', str(ra_game_data['ConsoleID'])),
+                        small_text=ra_game_data['ConsoleName'],
+                        buttons=buttons_filtered
+                    )
                 for i in range(interval):
                     if termsize != [term.width, term.height]:
                         termsize = [term.width, term.height]
                         print(f"{term.clear()}")
                         pixels = resizer(image)
                         drawer(pixels, term.height)
-                        buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'],     achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
+                        buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'],     achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'], ra_userdata.get('RichPresenceMsgDate', ''))
                     time.sleep(1)
+                
+                # Break to outer loop if RPC is disconnected (timeout detected)
+                if not rpc_connected:
+                    break
         
             
-            if timeout != 0:
+            if timeout != 0 and not rpc_connected:
                 while True:
                     for i in range(interval):
                         if termsize != [term.width, term.height]:
@@ -449,18 +468,29 @@ def main():
                             print(f"{term.clear()}")
                             pixels = resizer(image)
                             drawer(pixels, term.height)
-                            buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'],     achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'])
+                            buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'],     achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'], ra_userdata.get('RichPresenceMsgDate', ''))
                         time.sleep(1)
-                    ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserProfile.php?u={username}&y={apikey}&z={username}")
+                    no_cache = get_no_cache_string()
+                    ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserSummary.php?u={username}&y={apikey}&g=0&a=0&noCache={no_cache}")
                     if ra_userdata == None:
                         break
-                    elif ra_userdata["RichPresenceMsg"] != RPM_stored:
-                        RPM_stored == ra_userdata["RichPresenceMsg"]
-                        skip = True
-                        start_time = int(time.time())
-                        timeout_count = 0
-                        RPC.connect()
-                        break
+                    # Check if RichPresenceMsgDate is fresh again
+                    try:
+                        rp_date_str = ra_userdata.get("RichPresenceMsgDate")
+                        if rp_date_str:
+                            # Parse API date as UTC (API returns UTC times)
+                            rp_date = datetime.strptime(rp_date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                            current_date = datetime.now(timezone.utc)
+                            time_diff = (current_date - rp_date).total_seconds()
+                            if time_diff <= timeout:
+                                # Rich Presence is fresh again, reconnect RPC
+                                RPC.connect()
+                                rpc_connected = True
+                                start_time = int(time.time())
+                                break
+                    except (ValueError, KeyError, TypeError):
+                        # If parsing fails, continue waiting
+                        pass
             else:
                 break
                        
