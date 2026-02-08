@@ -379,6 +379,8 @@ def main():
                             current_date = datetime.now(timezone.utc)
                             time_diff = (current_date - rp_date).total_seconds()
                             if time_diff > timeout:
+                                if rpc_connected:
+                                    RPC.clear()
                                 RPC.close()
                                 rpc_connected = False
                     except (ValueError, KeyError, TypeError):
