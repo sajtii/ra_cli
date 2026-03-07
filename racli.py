@@ -8,14 +8,14 @@ import re
 import configparser
 import requests
 import io
+import os
 from datetime import datetime, timezone
 from pypresence import Presence
 from pypresence.types import ActivityType
 from pypresence.types import StatusDisplayType
 
 term = Terminal()
-
-
+appid = "1478833716725022866"
 
 #Characterpicker for drawing the image
 def charpicker(h):
@@ -24,7 +24,6 @@ def charpicker(h):
     l = len(charArr)
     mul = l/256
     return charArr[math.floor(h*mul)]
-
 
 #print() but better
 def printer(text):
@@ -57,13 +56,12 @@ def drawer(pixels, size):
             xb=xb+1
             printer(term.move_xy(xb, y)+term.color_rgb(r, g, b)(charpicker(grey)))
             xb=xb+1
-            
-            
+
 #splitting the text in case it is too long
 def splitter(text, tx, ty, chsize):
     finaltext=''
     
-    #trying to measure the real lenght of the printable text by removing ansi escape and replacing emojis with ee
+    #trying to measure the real length of the printable text by removing ansi escape and replacing emojis with ee
     #I use 2 characters for spacers because it seems emojis take up 2 character slots
     junk = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\(B)')
     emoji = re.compile("[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U000024C2-\U0001F251]+", flags=re.UNICODE)
@@ -145,9 +143,8 @@ def highlighter(text):
     colored_text.append(reset)
     return ''.join(colored_text)
 
-    
 #builds the printable data
-def buildandprint(x, y, username, pointe, pointt, title, con, achi_total, achi_earned, achi_text, rptext, motto, rp_date_str):
+def buildandprint(x, y, username, pointe, pointt, title, con, achi_total, achi_earned, achi_text, rptext, motto, rp_date_str, status):
     tx = 2*y+1
     ty = 0
     chsize = x-2*y
@@ -161,10 +158,10 @@ def buildandprint(x, y, username, pointe, pointt, title, con, achi_total, achi_e
     playing = f"{term.yellow2}Playing: {term.deepskyblue}{title}{term.normal}"
     console = f"{term.yellow2}Console: {term.deepskyblue}{con}{term.normal}"
     achi = f"{term.yellow2}Achievements: {term.green2}{achi_earned}{term.darkorchid1}/{term.green2}{achi_total} {term.darkorchid1}({achi_text}{term.darkorchid1}){term.normal}"
-    status = f"{term.yellow2}Status: {rptext}{term.normal}"
+    details = f"{term.yellow2}Details: {rptext}{term.normal}"
+    rp_status = f"{term.yellow2}RPC Status: {status}{term.normal}"
     rp_date = f"{term.yellow2}Status date: {term.deepskyblue}{rp_date_str if rp_date_str else 'N/A'}{term.normal}"
-    
-    
+
     finaltext = ''
     asd, _, ty = splitter(login, tx, ty, chsize)
     finaltext += asd
@@ -179,20 +176,19 @@ def buildandprint(x, y, username, pointe, pointt, title, con, achi_total, achi_e
     finaltext += asd
     asd, _, ty = splitter(achi, tx, ty, chsize)
     finaltext += asd
-    asd, _, ty = splitter(status, tx, ty, chsize)
+    asd, _, ty = splitter(details, tx, ty, chsize)
+    finaltext += asd
+    asd, _, ty = splitter(rp_status, tx, ty, chsize)
     finaltext += asd
     asd, _, ty = splitter(rp_date, tx, ty, chsize)
     finaltext += asd
     printer(finaltext)
-    
-    
+
 #clears the texts
 def cleartext(x, y):
     tx = 2*y+1
     for a in range(y-1):
-        
         printer(f"{term.move_xy(tx, a)}{term.clear_eol()}")
-        
 
 def get_no_cache_string():
     """Generate datetime string in format ddMMyyyyHHmmss for cache busting"""
@@ -200,111 +196,132 @@ def get_no_cache_string():
     return now.strftime('%d%m%Y%H%M%S')
 
 def ra_data(url):
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    else:
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return None
+    except requests.exceptions.ConnectionError:
         return None
 
-def set_buttons():
+def clear_term():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def switch(a):
+    if a == "0":
+        return "1"
+    else:
+        return "0"
+
+def settings():
     config = configparser.ConfigParser()
     config.read('config.ini')
-    def select1():
-        button = input('\u001b[33mWould you like to enable the current game button on your Discord profile while playing?\u001b[31m(y/n): \u001b[35m')
-        if button in ['y','Y','yes','Yes']:
-            print('\u001b[33mCurrent game button enabled!\033[0m')
-            config['BT']['gamepage'] = '1'
-        elif button in ['n','N','no','No']:
-            print('\u001b[33mCurrent game button disabled!\033[0m')
-            config['BT']['gamepage'] = '0'
-        else:
-            print('\u001b[31mError! Yes or No!\033[0m')
-            select1()
-            
-    def select2():
-        button = input('\u001b[33mWould you like to enable the RA profile button on your Discord profile while playing?\u001b[31m(y/n): \u001b[35m')
-        if button in ['y','Y','yes','Yes']:
-            print('\u001b[33mRA profile button enabled!\033[0m')
-            config['BT']['profile'] = '1'
-        elif button in ['n','N','no','No']:
-            print('\u001b[33mRA profile button disabled!\033[0m')
-            config['BT']['profile'] = '0'
-        else:
-            print('\u001b[31mError! Yes or No!\033[0m')
-            select2()
-    select1()
-    select2()
-    with open('config.ini', 'w') as configfile:
-        config.write(configfile)
-            
-def set_interval():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    interval = input('\u001b[33mSet the update interval in seconds \u001b[31m(min. 20): \u001b[35m')
-    try:
-        interval = int(interval)
-        if interval < 20:
-            interval = 20
-    except ValueError:
-        interval = 20
-    config['MISC']['interval'] = str(interval)
-    with open('config.ini', 'w') as configfile:
-        config.write(configfile)
-    print(f'\u001b[33mUpdate interval succesfully set to \u001b[35m{interval} \033[0;33mseconds.\033[0m')
-    
-def set_timeout():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    print('\u001b[33mAfter the Rich Presence message date is older than the specified number of seconds, the script stops updating Discord rich presence.')
-    print('\u001b[33mFor example, if the timeout is set to 300 (5 minutes), the script will stop updating Discord when the Rich Presence message is older than 5 minutes.')
-    print('\u001b[33mEnter 0 to disable this feature.')
-    timeout = input('\u001b[33mSet the timeout value in seconds \u001b[31m(0 to disable)\u001b[33m: \u001b[35m')
-    try:
-        timeout = int(timeout)
-    except ValueError:
-        timeout = 0
-    config['MISC']['timeout'] = str(timeout)
-    with open('config.ini', 'w') as configfile:
-        config.write(configfile)
-    print(f"\u001b[33mTimeout value successfully set to \u001b[35m{timeout} \033[0;33mseconds.\033[0m")
-    
-def set_charset():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    print('\u001b[33mSelect a preset of characters for drawing the image!\033[0m')
-    print('\u001b[33m1. Pixel(default): \u001b[35m█  \u001b[31m(This one looks the best, imo)\033[0m')
-    print('\u001b[33m2. Hash: \u001b[35m#\033[0m')
-    print("""\u001b[33m3. "The Standard":\u001b[35m .-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@  \u001b[31m(idk, found on the internet, looks okay to me)\033[0m""")
-    print("""\u001b[33m4. "The Simple":\u001b[35m .:-=+*#%@\033[0m""")
-    print('\u001b[33m5. Custom: Write some characters into the \033[0;34mcharset.txt \u001b[33mfile. If you use multiple characters, try to arrange them from less visible to more visible, just like the other examples above.\033[0m')
-    def decide():
-        selected = input("\u001b[33mEntre the number of your selected preset:\u001b[35m")
+    username = config.get('RA', 'username')
+    apikey = config.get('RA', 'apikey')
+    bt_prof = config.get('BT', 'profile')
+    bt_gpage = config.get('BT', 'gamepage')
+    charset = config.get('MISC', 'charset')
+    interval = config.get('MISC', 'interval')
+    timeout = config.get('MISC', 'timeout')
+
+    while True:
+        clear_term()
         try:
-            selected = int(selected)
+            ch_text = ["Pixel", "Hash", "Standard", "Simple", "Custom"][int(charset) - 1]
         except ValueError:
-            pass
-        if selected in (1, 2, 3, 4, 5):
-            config['MISC']['charset'] = str(selected)
+            charset = "1"
+            ch_text = "Pixel"
+        print(f"\u001b[33m1. Username:\u001b[35m {username}\033[0m")
+        print(f"\u001b[33m2. API Key:\u001b[35m {apikey}\033[0m")
+        print(f"\u001b[33m3. Update interval:\u001b[35m {interval} seconds\033[0m")
+        print(f"\u001b[33m4. Timeout: \u001b[35m{timeout}{" seconds" if int(timeout) > 0 else "\u001b[31m (disabled)"}\033[0m")
+        print(f"\u001b[33m5. Charset:\u001b[35m {ch_text}\033[0m")
+        print(f"\u001b[33m6. Buttons\033[0m")
+        print("")
+        print("\u001b[33m7. Save & Exit\033[0m")
+        print("\u001b[33m8. Exit without saving\033[0m")
+        print("")
+        choice = input("\u001b[33m> \u001b[35m")
+        print("\033[0m")
+        if choice == "1":
+            clear_term()
+            username = input("\u001b[33mEnter your RA Username: \u001b[35m")
+        elif choice == "2":
+            clear_term()
+            apikey = input("\u001b[33mEnter your RA Web API Key: \u001b[35m")
+        elif choice == "3":
+            clear_term()
+            interval = input('\u001b[33mSet the update interval in seconds \u001b[31m(min. 5): \u001b[35m')
+            try:
+                interval = int(interval)
+                if interval < 5:
+                    interval = 5
+            except ValueError:
+                interval = 5
+        elif choice == "4":
+            clear_term()
+            print('\u001b[33mAfter the Rich Presence message date is older than the specified number of seconds, the script stops updating Discord rich presence.\033[0m')
+            print('\u001b[33mFor example, if the timeout is set to 300 (5 minutes), the script will stop updating Discord when the Rich Presence message is older than 5 minutes.\033[0m')
+            print('\u001b[33mEnter 0 to disable this feature.\033[0m')
+            print('\u001b[33mThe minimum value is 130 because things on RA seem to get updated every 2 minutes after you launch into a game.')
+            timeout = input('\u001b[33mSet the timeout value in seconds \u001b[31m(0 to disable)\u001b[33m: \u001b[35m')
+            try:
+                t = int(timeout)
+                if 0 < t < 130:
+                    timeout = "130"
+            except ValueError:
+                timeout = "0"
+
+        elif choice == "5":
+            while True:
+                clear_term()
+                print('\u001b[33mSelect a preset of characters for drawing the image!\033[0m')
+                print('\u001b[33m1. Pixel(default): \u001b[35m█  \u001b[31m(This one looks the best, imo)\033[0m')
+                print('\u001b[33m2. Hash: \u001b[35m#\033[0m')
+                print("""\u001b[33m3. "The Standard":\u001b[35m .-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@  \u001b[31m(idk, found on the internet, looks okay to me)\033[0m""")
+                print("""\u001b[33m4. "The Simple":\u001b[35m .:-=+*#%@\033[0m""")
+                print('\u001b[33m5. Custom: Write some characters into the \033[0;34mcharset.txt \u001b[33mfile. If you use multiple characters, try to arrange them from less visible to more visible, just like the other examples above.\033[0m')
+                selected = input("\u001b[33mEntre the number of your selected preset:\u001b[35m")
+                if selected in ("1", "2", "3", "4", "5"):
+                    charset = selected
+                    break
+
+        elif choice == "6":
+            while True:
+                clear_term()
+                print("\u001b[33mHere you can enable or disable different buttons on your profile.\033[0m")
+                print("\u001b[33mOne leads to your RA profile page, the other to the page of the game you currently playing.\033[0m")
+                print("\u001b[33mNote: You can't see them on your own profile, but others will do so don't panic.\033[0m")
+                print("")
+                print(f"\u001b[33m1. Current game button: {"\u001b[32mEnabled" if bt_gpage == "1" else "\u001b[31mDisabled"}\033[0m")
+                print(f"\u001b[33m2. RA profile button: {"\u001b[32mEnabled" if bt_prof == "1" else "\u001b[31mDisabled"}\033[0m")
+                print("\u001b[33m3. Back\033[0m")
+                print("")
+                choice = input("\u001b[33m> \u001b[35m")
+                print("\033[0m")
+                if choice == "1":
+                    bt_gpage = switch(bt_gpage)
+                elif choice == "2":
+                    bt_prof = switch(bt_prof)
+                elif choice == "3":
+                    break
+
+        elif choice == "7":
+            config['RA']['username'] = str(username)
+            config['RA']['apikey'] = str(apikey)
+            config['BT']['profile'] = str(bt_prof)
+            config['BT']['gamepage'] = str(bt_gpage)
+            config['MISC']['charset'] = str(charset)
+            config['MISC']['interval'] = str(interval)
+            config['MISC']['timeout'] = str(timeout)
             with open('config.ini', 'w') as configfile:
                 config.write(configfile)
-            print('\033[0m')
-        else:
-            print('\u001b[33mPlease select a correct number from the options above.\033[0m')
-            decide()
-    decide()
-    
-def setup():
-    config = configparser.ConfigParser()
-    config.read('config.ini')    
-    username = input("\u001b[33mEnter your RA Username: \u001b[35m")
-    apikey = input("\u001b[33mEnter your RA Web API Key: \u001b[35m")
-    appid = input("\u001b[33mEnter your Discord App ID: \u001b[35m")
-    config['RA']['username'] = str(username)
-    config['RA']['apikey'] = str(apikey)
-    config['DC']['appid'] = str(appid)
-    with open('config.ini', 'w') as configfile:
-                config.write(configfile)
-    print('\u001b[33mYour details have been successfully updated!\033[0m')
+            clear_term()
+            break
+        elif choice == "8":
+            clear_term()
+            break
     
 def main():
     #loading config values
@@ -314,12 +331,22 @@ def main():
     data.read('data.ini')
     username = config.get('RA', 'username')
     apikey = config.get('RA', 'apikey')
-    appid = config.get('DC', 'appid')
-    interval = int(config.get('MISC', 'interval'))
     charset_x = config.get('MISC', 'charset')
-    timeout = int(config.get('MISC', 'timeout'))
-    
-    #loading other values
+    bt_prof = config.get('BT', 'profile')
+    bt_game = config.get('BT', 'gamepage')
+    try:
+        interval = int(config.get('MISC', 'interval'))
+        if interval < 5:
+            interval = 5
+    except ValueError:
+        interval = 5
+    try:
+        timeout = int(config.get('MISC', 'timeout'))
+        if 0 < timeout < 130:
+            timeout = 130
+    except ValueError:
+        timeout = 0
+
     global charset
     if charset_x == '1':
         charset = '█'
@@ -338,72 +365,71 @@ def main():
             charset = '█'
     else:
         charset = '█'
-   
-    try:
-        interval = int(config.get('MISC', 'interval'))
-        if interval < 20:
-            interval = 20
-            config['MISC']['interval'] = '20'
-            with open('config.ini', 'w') as configfile:
-                config.write(configfile)
-    except ValueError:
-        interval = 20
-        config['MISC']['interval'] = '20'
-        with open('config.ini', 'w') as configfile:
-            config.write(configfile)
-            
-       
-    start_time = int(time.time())
+
+    image = Image.new("RGB", (5, 5), color=(0, 0, 0))
     current_game = None
     ra_userdata = None
-    rpc_connected = True
-    
+    rpc_status = 0 #0 inactive/disconnected, 1 active, 3 error
+    fp = True
+    rpc_connected = False
+    rpc_st_text = [f"{term.grey}Inactive", f"{term.green2}Active","", f"{term.red}Error!"]
     RPC = Presence(appid)
-    RPC.connect()
+
+    start_time = None
+    total_points = ""
+    total_true_points = ""
+    game_title = ""
+    console_name = ""
+    achi_max = ""
+    achi_earned = ""
+    achi_text = ""
+    term_rpc_msg = ""
+    motto = ""
+    rpc_date = ""
+
     with term.hidden_cursor(), term.cbreak(), term.location(), term.fullscreen():
         termsize = [term.width, term.height]
         while True:
-            while True:
-                no_cache = get_no_cache_string()
-                ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserSummary.php?u={username}&y={apikey}&g=0&a=0&noCache={no_cache}")
-                if ra_userdata == None:
-                    break
-                
-                # Check timeout based on RichPresenceMsgDate
-                if timeout != 0 and rpc_connected:
-                    try:
-                        rp_date_str = ra_userdata.get("RichPresenceMsgDate")
-                        if rp_date_str:
-                            # Parse API date as UTC (API returns UTC times)
-                            rp_date = datetime.strptime(rp_date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                            current_date = datetime.now(timezone.utc)
-                            time_diff = (current_date - rp_date).total_seconds()
-                            if time_diff > timeout:
-                                if rpc_connected:
-                                    RPC.clear()
-                                RPC.close()
-                                rpc_connected = False
-                    except (ValueError, KeyError, TypeError):
-                        # If parsing fails, continue normally
-                        pass
-                
-                    
+            #fetching data from RA
+            no_cache = get_no_cache_string()
+            ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserSummary.php?u={username}&y={apikey}&g=0&a=0&noCache={no_cache}")
+            if ra_userdata == None:
+                rpc_status = 3
+            else:
+                total_points = ra_userdata['TotalPoints']
+                total_true_points = ra_userdata['TotalTruePoints']
+                motto = ra_userdata['Motto']
+                rpc_date = ra_userdata.get('RichPresenceMsgDate', '')
+
+                rp_date_str = ra_userdata.get("RichPresenceMsgDate")
+                rp_date = datetime.strptime(rp_date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                current_date = datetime.now(timezone.utc)
+                time_diff = (current_date - rp_date).total_seconds()
+                if time_diff <= timeout or timeout == 0:
+                    rpc_status = 1
+                else:
+                    rpc_status = 0
+
+            if rpc_status not in [0, 3]:
                 ra_game_data = ra_data(f"https://retroachievements.org/API/API_GetGame.php?z={username}&y={apikey}&i={ra_userdata['LastGameID']}")
                 if ra_game_data == None:
-                    break
+                    rpc_status = 3
                 ra_game_prog = ra_data(f"https://retroachievements.org/API/API_GetUserProgress.php?y={apikey}&u={username}&i={ra_userdata['LastGameID']}")
                 if ra_game_prog == None:
-                    break
-                ra_game_prog = ra_game_prog.get(f"{ra_userdata['LastGameID']}", {})
-            
-            
+                    rpc_status = 3
+                else:
+                    ra_game_prog = ra_game_prog.get(f"{ra_userdata['LastGameID']}", {})
+
+            if rpc_status not in [0, 3]:
                 if current_game != ra_userdata['LastGameID']:
-                    if config.get('BT', 'gamepage') == '1':
-                        button1 = {"label": "View on RetroAchievements", "url": f"https://retroachievements.org/game/{ra_userdata['LastGameID']}"}
+                    if bt_game == '1':
+                        button1 = {"label": "View on RetroAchievements",
+                                   "url": f"https://retroachievements.org/game/{ra_userdata['LastGameID']}"}
                     else:
                         button1 = None
-                    if config.get('BT', 'profile') == '1':    
-                        button2 = {"label": f"{username}'s RA Page", "url": f"https://retroachievements.org/user/{username}"}  
+                    if bt_prof == '1':
+                        button2 = {"label": f"{username}'s RA Page",
+                                   "url": f"https://retroachievements.org/user/{username}"}
                     else:
                         button2 = None
                     buttons = [button1, button2]
@@ -416,9 +442,12 @@ def main():
                     image = Image.open(io.BytesIO(requests.get(f"https://media.retroachievements.org{ra_game_data['ImageIcon']}").content))
                     pixels = resizer(image)
                     drawer(pixels, term.height)
-                    start_time = int(time.time())
-                
-            
+
+                game_title = ra_game_data['GameTitle']
+                console_name = ra_game_data['ConsoleName']
+                achi_max = ra_game_prog['NumPossibleAchievements']
+                term_rpc_msg = ra_userdata['RichPresenceMsg']
+
                 if ra_game_prog['NumAchieved'] == 0:
                     achi_earned = 0
                     achi_text = f"{term.white}None"
@@ -431,90 +460,60 @@ def main():
                     achi_earned = ra_game_prog['NumAchievedHardcore']
                     achi_text = f"{term.red}Hardcore"
                     rpc_achi = f"\uD83C\uDFC6 {ra_game_prog['NumAchievedHardcore']}/{ra_game_prog['NumPossibleAchievements']} (Hardcore)"
-                cleartext(term.width,term.height)
-                buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'], achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'], ra_userdata.get('RichPresenceMsgDate', ''))
-            
-                if rpc_connected:
-                    RPC.update(
-                        activity_type=ActivityType.PLAYING,
-                        status_display_type=StatusDisplayType.NAME,
-                        name= ra_game_data['GameTitle'],
-                        details= trimmer(ra_userdata["RichPresenceMsg"]),
-                        state= rpc_achi,
-                        start=start_time,
-                        large_image=f"https://media.retroachievements.org{ra_game_data['ImageIcon']}",
-                        large_text=rpc_achi,
-                        small_image=data.get('CI', str(ra_game_data['ConsoleID'])),
-                        small_text=ra_game_data['ConsoleName'],
-                        buttons=buttons_filtered
-                    )
-                for i in range(interval):
-                    if termsize != [term.width, term.height]:
-                        termsize = [term.width, term.height]
-                        print(f"{term.clear()}")
-                        pixels = resizer(image)
-                        drawer(pixels, term.height)
-                        buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'],     achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'], ra_userdata.get('RichPresenceMsgDate', ''))
-                    time.sleep(1)
-                
-                # Break to outer loop if RPC is disconnected (timeout detected)
+
+                cleartext(term.width, term.height)
+                buildandprint(term.width, term.height, username, total_points, total_true_points, game_title,console_name, achi_max, achi_earned, achi_text, term_rpc_msg, motto, rpc_date, rpc_st_text[rpc_status])
+
+            if rpc_status == 1:
                 if not rpc_connected:
-                    break
-        
-            
-            if timeout != 0 and not rpc_connected:
-                while True:
-                    for i in range(interval):
-                        if termsize != [term.width, term.height]:
-                            termsize = [term.width, term.height]
-                            print(f"{term.clear()}")
-                            pixels = resizer(image)
-                            drawer(pixels, term.height)
-                            buildandprint(term.width, term.height, username, ra_userdata['TotalPoints'],ra_userdata['TotalTruePoints'], ra_game_data['GameTitle'], ra_game_data['ConsoleName'],ra_game_prog['NumPossibleAchievements'],     achi_earned, achi_text, ra_userdata['RichPresenceMsg'], ra_userdata['Motto'], ra_userdata.get('RichPresenceMsgDate', ''))
-                        time.sleep(1)
-                    no_cache = get_no_cache_string()
-                    ra_userdata = ra_data(f"https://retroachievements.org/API/API_GetUserSummary.php?u={username}&y={apikey}&g=0&a=0&noCache={no_cache}")
-                    if ra_userdata == None:
-                        break
-                    # Check if RichPresenceMsgDate is fresh again
-                    try:
-                        rp_date_str = ra_userdata.get("RichPresenceMsgDate")
-                        if rp_date_str:
-                            # Parse API date as UTC (API returns UTC times)
-                            rp_date = datetime.strptime(rp_date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                            current_date = datetime.now(timezone.utc)
-                            time_diff = (current_date - rp_date).total_seconds()
-                            if time_diff <= timeout:
-                                # Rich Presence is fresh again, reconnect RPC
-                                RPC.connect()
-                                rpc_connected = True
-                                start_time = int(time.time())
-                                break
-                    except (ValueError, KeyError, TypeError):
-                        # If parsing fails, continue waiting
-                        pass
-            else:
-                break
-                       
-    print("Something went wrong! Run the setup script (python racli.py -s) and make sure your details are correct.")
+                    RPC.connect()
+                    rpc_connected = True
+                    start_time = int(time.time())
+                RPC.update(
+                    activity_type=ActivityType.PLAYING,
+                    status_display_type=StatusDisplayType.NAME,
+                    name=ra_game_data['GameTitle'],
+                    details=trimmer(ra_userdata["RichPresenceMsg"]),
+                    state=rpc_achi,
+                    start=start_time,
+                    large_image=f"https://media.retroachievements.org{ra_game_data['ImageIcon']}",
+                    large_text=rpc_achi,
+                    small_image=data.get('CI', str(ra_game_data['ConsoleID'])),
+                    small_text=ra_game_data['ConsoleName'],
+                    buttons=buttons_filtered
+                )
+            elif rpc_status in [0, 3]:
+                if rpc_connected:
+                    RPC.clear()
+                    RPC.close()
+                    rpc_connected = False
+
+            #frist print to display Error just in case
+            if rpc_status in [0, 3] and fp == True:
+                fp = False
+                pixels = resizer(image)
+                drawer(pixels, term.height)
+                cleartext(term.width, term.height)
+                buildandprint(term.width, term.height, username, total_points, total_true_points, game_title,console_name, achi_max, achi_earned, achi_text, term_rpc_msg, motto, rpc_date, rpc_st_text[rpc_status])
+
+            for i in range(interval):
+                if termsize != [term.width, term.height]:
+                    termsize = [term.width, term.height]
+                    print(f"{term.clear()}")
+                    pixels = resizer(image)
+                    drawer(pixels, term.height)
+                    cleartext(term.width, term.height)
+                    buildandprint(term.width, term.height, username, total_points, total_true_points, game_title, console_name, achi_max, achi_earned, achi_text, term_rpc_msg, motto, rpc_date, rpc_st_text[rpc_status])
+                time.sleep(1)
+
+    print("Something went wrong! Check your settings (python racli.py -s) and make sure your details are correct.")
+
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--setup', action='store_true', help="run setup script")
-    parser.add_argument('-c', '--charset', action='store_true', help="select charset presets or set it to custom")
-    parser.add_argument('-i', '--interval', action='store_true', help="set update interval")
-    parser.add_argument('-t', '--timeout', action='store_true', help="set timeout value")
-    parser.add_argument('-b', '--buttons', action='store_true', help="enable or disable buttons on your discord profile")
+    parser.add_argument('-s', '--settings', action='store_true')
     args = parser.parse_args()
-    if args.setup:
-        setup()
-    elif args.charset:
-        set_charset()
-    elif args.interval:
-        set_interval()
-    elif args.timeout:
-        set_timeout()
-    elif args.buttons:
-        set_buttons()
+    if args.settings:
+        settings()
     else:
         main()
