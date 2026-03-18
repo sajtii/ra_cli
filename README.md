@@ -26,9 +26,9 @@ When you have provided all your details, you can launch the script without flags
 > The [Docker](#docker) container requires manual editing of `config.ini` because it runs non-interactively.  Alternatively you may run `python racli.py -s` manually as shown above and copy the generated `config.ini` into the Docker bind mount path in the [docker-compose.yml](docker-compose.yml) file.
 
 ## Screenshots
-|![3.bmp](https://github.com/user-attachments/files/26075803/3.bmp)|![4.bmp](https://github.com/user-attachments/files/26075813/4.bmp)|![2](https://github.com/user-attachments/assets/070c4e64-f51e-481a-b7e5-c0a374b16c4e)|
+|<img width="1235" height="708" alt="3" src="https://github.com/user-attachments/assets/1c1014c1-6a88-475c-89c8-f82119519980" />|<img width="1236" height="709" alt="4" src="https://github.com/user-attachments/assets/9ffa4b36-99b1-401d-b857-b288bfdd1a98" />|![2](https://github.com/user-attachments/assets/070c4e64-f51e-481a-b7e5-c0a374b16c4e)|
 |---|---|---|
-|![1.bmp](https://github.com/user-attachments/files/26075856/1.bmp)|![5.bmp](https://github.com/user-attachments/files/26075862/5.bmp)|![2.bmp](https://github.com/user-attachments/files/26075866/2.bmp)|
+|<img width="255" height="134" alt="1" src="https://github.com/user-attachments/assets/b35e2a92-dbda-4464-b99d-312997e48d95" />|<img width="309" height="477" alt="5" src="https://github.com/user-attachments/assets/cd1b6d8f-1bdd-4f3f-b0d1-0ac6393c7da0" />|<img width="276" height="411" alt="2" src="https://github.com/user-attachments/assets/fc40a07d-c160-4137-9fa7-5b92c50383c2" />|
 
 ## Docker
 
