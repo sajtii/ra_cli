@@ -11,6 +11,8 @@ A little software which lets you share your RetroAchievements activity with your
 - From RetroAchievements, your username and your API key
 	- On the website go to your profile settings, scroll down to the `Authentication` section and there you will find your Web API Key.
 
+**Note**: If you don't care about fancy terminal graphics, use `sracli.py`. In that case, you only need to install `pypresence` and `configparser` for the requirements.
+
 ## Features
 - Detailed Rich Presence on your Discord profile (name of the game, details about what you're currently doing in the game, icons, etc.)
 - Two clickable buttons (only others can see them): One leads to the RA page of the game you're currently playing; the other leads to your RA profile. You can enable or disable them using `python racli.py -s`.
