@@ -12,7 +12,7 @@ services:
 
   # https://hub.docker.com/r/kasmweb/discord
   discord:
-    image: kasmweb/discord:1.16.0
+    image: kasmweb/discord:1.18.0
     container_name: discord
     restart: unless-stopped
     ports:
